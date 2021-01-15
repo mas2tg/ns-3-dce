@@ -130,6 +130,10 @@ def configure(conf):
          
     conf.env.prepend_value('LINKFLAGS', '-Wl,--no-as-needed')
     conf.env.append_value('LINKFLAGS', '-pthread')
+    
+    conf.env.append_value('LINKFLAGS', '-L/home/wahoo/Documents/research/ns-3-allinone/ns-3-dev/build/lib/') #MA quick hack
+    #conf.env.append_value('LINKFLAGS', '-ldl') # MA trying to fix a problem
+
     conf.check (lib='dl', mandatory = True)
     conf.check_cc(fragment='int main() {__get_cpu_features();}\n', msg='Checking for glibc get_cpu_features', define_name='HAVE_GETCPUFEATURES', mandatory=False)
     conf.check_cc(fragment='int main() {secure_getenv("test");}\n', msg='Checking for glibc secure_getenv', define_name='HAVE_SECURE_GETENV', mandatory=False)
@@ -529,7 +533,9 @@ def build_a_script(bld, name, needed = [], **kw):
         kw['features'] = 'cxx cxxprogram'
     if bld.env['NS3_ENABLE_STATIC']:
         for module in kw['use']:
+            # print("[DEBUG] kw[use] = ", kw['use'])
             kw['linkflags'] = kw.get('linkflags', [])
+            # print("[DEBUG] kw.get(linkflags,[]) = ", kw.get('linkflags',[]))
             # XXX pkg-config doesn't give the proper order of whole-archive option..
             if 'dce' in module.lower():
                 continue
@@ -541,7 +547,10 @@ def build_a_script(bld, name, needed = [], **kw):
                 continue
             kw['linkflags'] += ['-ldl']
             kw['linkflags'] += ['-Wl,--whole-archive,-Bstatic']
-            kw['linkflags'] += bld.env['STLIB_ST_%s' % module.upper()]
+            # print(bld.env['STLIB_ST_%s' % module.upper()])
+            kw['linkflags'] += [bld.env['STLIB_ST_%s' % module.upper()]]
+            # print()
+
     program = bld(**kw)
     program.is_ns3_program = True
     bld.env.append_value('NS3_RUNNABLE_PROGRAMS', name)
@@ -571,6 +580,7 @@ def add_myscripts(bld):
         if os.path.isdir(os.path.join('myscripts', dir)):
             bld.recurse(os.path.join('myscripts', dir))
         elif dir.endswith(".cc"):
+            print("[DEBUG] attempting to build ", dir)
             bld.build_a_script('dce',
                                needed = bld.env['NS3_MODULES_FOUND'] + ['dce'],
                                target='bin/' + os.path.splitext(dir)[0],
@@ -816,7 +826,7 @@ def build(bld):
     # and forward to the dce_* code
     bld.shlib(source = ['model/libc.cc', 'model/libc-setup.cc', 'model/libc-global-variables.cc'],
               target='lib/c-ns3',
-              cxxflags=['-g', '-fno-profile-arcs', '-fno-test-coverage', '-Wno-builtin-declaration-mismatch'],
+              cxxflags=['-g', '-fno-profile-arcs', '-fno-test-coverage', '-Wno-builtin-declaration-mismatch', '/usr/lib/x86_64-linux-gnu/libdl.a'], # MA: modified this bit
               defines=['LIBSETUP=libc_setup'],
               linkflags=['-nostdlib', '-fno-profile-arcs',
                          '-Wl,--version-script=' + os.path.join('model', 'libc.version'),

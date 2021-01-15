@@ -147,17 +147,23 @@ def build_ns3_libname(version, module, profile):
 
 def _check_dependencies(conf, required, mandatory):
     found = []
-    libcore = build_ns3_libname("*", "core", conf.env['LIB_SUFFIX'])
-    ns3_dir_pkgconfig = conf.env['NS3_DIR'] + '/lib/pkgconfig'
-
+    libcore = build_ns3_libname("ns3-dev", "core", conf.env['LIB_SUFFIX']) # MA: changed
+    ns3_dir_pkgconfig = conf.env['NS3_DIR'] # + '/lib/pkgconfig' # MA: changed
+    print("[DEBUG] ns3_dir_pkgconfig:" + ns3_dir_pkgconfig)
+    match_pkg = ""
+	
     if not 'NS3_VERSION' in conf.env:
-
-        pcfiles = glob.glob(ns3_dir_pkgconfig + '/' + libcore + ".pc")
+        pcfiles_names = ns3_dir_pkgconfig + '/src/core/' + libcore + ".pc"
+        #print("[DEBUG] pcfiles_names:", pcfiles_names)
+        pcfiles = glob.glob(pcfiles_names) #MA: changed
+        print("pcfiles:", pcfiles)
+        print("len(pcfiles):", len(pcfiles))
         if len(pcfiles) > 1:
             Logs.errors("Too many candidates, DCE should only see one ns-3 version.")
             return
         elif len(pcfiles) == 1:
             match_pkg = os.path.basename(pcfiles[0])
+            print("[DEBUG] match_pkg is", match_pkg)
             lib = re.search("(ns[0-9][\.\-][dev0-9\.]+)", match_pkg)
             if lib.group(0) is None:
                 Logs.error("Could not find version for the match %s" % match_pkg)
@@ -165,26 +171,39 @@ def _check_dependencies(conf, required, mandatory):
 
             version = lib.group(0)
             conf.env['NS3_VERSION'] = version
+            #print("got here")
         else:
             Logs.error("Could not find " + libcore)
             return
+
+    #TODO: either pass my_path as a parameter for _check_dependencies OR make my_path a global variable that is set by whoever calls _check_dependencies
+    mypath = os.environ.get("PKG_CONFIG_PATH") #construct all necessary paths before the next for loop
+    my_deps = "antenna buildings     csma-layout  fd-net-device  lr-wpan   netanim             point-to-point         spectrum    topology-read       wave  aodv          config-store  dsdv         flow-monitor   lte       network             point-to-point-layout  stats       traffic-control     wifi applications  core          dsr          internet       mesh      nix-vector-routing  propagation            tap-bridge  uan                 wimax bridge        csma          energy       internet-apps  mobility  olsr                sixlowpan              test        virtual-net-device".split()
+    for my_dep in my_deps:
+        if len(my_dep) > 0:
+            new_dep_path = ns3_dir_pkgconfig + '/src/' + my_dep
+            #print("[DEBUG] adding " + new_dep_path + " to mypath")
+            mypath = ":".join([mypath, new_dep_path]) 
+            
 
     for module in required:
         if module in conf.env['NS3_MODULES_FOUND']:
             continue
         libname = build_ns3_libname(conf.env['NS3_VERSION'], module.lower(), conf.env['LIB_SUFFIX'])
+        
         retval = conf.check_cfg(package=libname,
             args='--cflags --libs' + (' --static' if conf.env['NS3_ENABLE_STATIC'] else ''),
             mandatory=mandatory,
             msg="Checking for %s (%s)" % (libname, "mandatory" if mandatory else "optional"),
             uselib_store='NS3_%s' % module.upper(),
-            pkg_config_path=":".join([os.environ.get("PKG_CONFIG_PATH"), ns3_dir_pkgconfig])
+            pkg_config_path=mypath
             )
 
         if retval is not None:
             # XXX pkg-config doesn't give the proper order of whole-archive option..
             if conf.env['NS3_ENABLE_STATIC']:
                 libname = 'STLIB_ST_NS3_%s' % module.upper()
+                print("[DEBUG] match_pkg is", match_pkg)
                 conf.env[libname] = '-l%s' % (match_pkg.replace('libns3', 'ns3'))
                 for lib in conf.env['LIB_NS3_%s' % module.upper()]:
                     if 'ns3' in lib:
@@ -312,6 +331,7 @@ def _build_library(bld, name, *k, **kw):
     if not bld.env['NS3_ENABLE_STATIC']:
         if bld.env['CXX_NAME'] in ['gcc', 'icc'] and bld.env['WL_SONAME_SUPPORTED']:
             linkflags.append('-Wl,--soname=%s' % _c_libname(bld, name))
+            print(linkflags)
             pass
         elif bld.env['CXX_NAME'] in ['gcc', 'icc'] and \
                 os.uname()[4] == 'x86_64' and \

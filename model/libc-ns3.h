@@ -305,6 +305,7 @@ NATIVE (popen)
 NATIVE (pclose)
 NATIVE (getgroups)
 NATIVE (setgroups)
+NATIVE (group_member)
 NATIVE (confstr)
 NATIVE (sync)
 NATIVE (link)
@@ -725,6 +726,8 @@ NATIVE (regerror)
 
 // iconv.h
 NATIVE (iconv_open)
+NATIVE (iconv)
+NATIVE (iconv_close)
 
 // glob.h
 NATIVE (glob)
@@ -738,6 +741,9 @@ NATIVE (error)
 
 NATIVE (dl_iterate_phdr)
 NATIVE (__libc_start_main)
+NATIVE (__stpcpy_chk)
+NATIVE (__freading)
+
 
 #undef DCE
 #undef DCET
